@@ -23,6 +23,9 @@ themselves when one of the tracked objects is destroyed. This is useful if the
 function you are registering with the Signal holds a reference to an object that
 might be destroyed before the Signal is destroyed.
 
+This library is 'light' in terms of the boost::Signal2 library, which is thread
+safe, has ordered connections, and in general is more heavy-weight.
+
 ## Rationale
 
 The current signals library is too heavy to have many signals within each
