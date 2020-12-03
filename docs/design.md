@@ -59,7 +59,7 @@ the cache, but it leaves more space for others.
 
 ## Interfaces
 
-### `class Lifetime_view`
+### `class Lifetime_observer`
 
 This is esentailly a wrapper around `std::weak_ptr<void>` that only allows
 access to the `is_expired()` method. Any non-const `std::weak_ptr` can reset the
@@ -70,13 +70,13 @@ destroyed.
 
 ```cpp
 /// Provides a const view of a std::weak_ptr, providing an is_expired() check.
-/** Always contains a valid lifetime, therefore it cannot be moved from. */
+/** Always contains a valid lifetime, unless moved from. */
 class Lifetime_observer {
- public:
+   public:
     Lifetime_observer() = delete;
 
-    // Note: The below overloads are provided so a Lifetime_observer can be implicitly
-    // constructed from std::..._ptr objects in a function parameter.
+    // Note: The below overloads are provided so a Lifetime_observer can be
+    // implicitly constructed from std::..._ptr objects in a function parameter.
 
     /// Construct a view of the lifetime of the object pointed to by \p p.
     /** Throws std::invalid_argument if \p p is nullptr. */
@@ -91,27 +91,27 @@ class Lifetime_observer {
     /// Creates a new observer to the same object.
     Lifetime_observer(Lifetime_observer const&) = default;
 
-    /// Moving will leave the moved from Lifetime_observer in an undefined state.
+    /// Moving will leave the moved from Lifetime_observer in an undefined state
     Lifetime_observer(Lifetime_observer&&) = default;
 
     /// Overwrites *this to track the same lifetime as the rhs.
-    auto operator=(Lifetime_observer const&) -> Lifetime_view& = default;
+    auto operator=(Lifetime_observer const&) -> Lifetime_observer& = default;
 
-    /// Moving will leave the moved from Lifetime_observer in an undefined state.
-    auto operator=(Lifetime_observer&&) -> Lifetime_view& = default;
+    /// Moving will leave the moved from Lifetime_observer in an undefined state
+    auto operator=(Lifetime_observer&&) -> Lifetime_observer& = default;
 
- public:
+   public:
     /// Return true if the tracked object has been deleted.
     auto is_expired() const -> bool;
 
     /// Return a unique id that is associated with the tracked object
     /** Returns zero if the tracked object has been destroyed. */
     auto get_id() const -> std::uintptr_t;
-    // ^^return the pointer value of handle_, but only if it is alive still.
 
- private:
+   private:
     std::weak_ptr<void> handle_;
 };
+
 ```
 
 ### `class Lifetime`
@@ -132,32 +132,34 @@ object that is referenced to avoid dangling references.
 /// A class to keep track of an object's lifetime.
 /** A Lifetime_observer can check if a Lifetime has ended. */
 class Lifetime {
- public:
-   /// Create a new lifetime to track.
-   Lifetime();    // Initializes life_ with any value.
+   public:
+    /// Create a new lifetime to track.
+    Lifetime();
 
-   /// Create a new lifetime to track.
-   /** Tracking does not split across multiple Lifetime objects. */
-   Lifetime(Lifetime const&);
+    /// Create a new lifetime to track.
+    /** Tracking does not split across multiple Lifetime objects. */
+    Lifetime(Lifetime const&);
 
-   /// Transfers the lifetime tracking to the new instance.
-   /** Trackers of the moved from object will now track the newly constructed object. */
-   Lifetime(Lifetime&&);
+    /// Transfers the lifetime tracking to the new instance.
+    /** Existing trackers will now track the newly constructed lifetime. */
+    Lifetime(Lifetime&&) = default;
 
-   /// Create a new lifetime to track, overwriting and destroying the existing lifetime.
-   /** Tracking does not split across multiple Lifetime objects. */
-   auto operator=(Lifetime const&) -> Lifetime&;
+    /// Create a new lifetime to track, destroying the existing lifetime.
+    /** Tracking does not split across multiple Lifetime objects. */
+    auto operator=(Lifetime const& rhs) -> Lifetime&;
 
-   /// Transfers the lifetime of the moved from object to *this.
-   /** Anything tracking the moved from object will now be tracking *this. */
-   auto operator=(Lifetime&&) -> Lifetime&;
+    /// Transfers the lifetime of the moved from object to *this.
+    /** Anything tracking the moved from object will now be tracking *this. */
+    auto operator=(Lifetime&& rhs) -> Lifetime&;
 
- public:
-   /// Return a Lifetime_observer that lets you check if *this has been destroyed.
-   /** The returned object is valid to access after *this has been destroyed. */
-   auto track() const -> Lifetime_observer;
+   public:
+    /// Return a Lifetime_observer, to check if *this has been destroyed.
+    /** The returned object is valid even after *this i\ destroyed. Even though
+     *  this should never throw an exception, if a memory allocation fails at
+     *  construction, it might not throw std::bad_alloc, returning nullptr. */
+    auto track() const -> Lifetime_observer;
 
- private:
+   private:
     std::shared_ptr<bool> life_;
 };
 ```
@@ -177,60 +179,63 @@ template <typename Signature>
 class Slot;
 
 /// An invocable type with object lifetime tracking.
-/** An object of this type always holds a valid std::function object. */
-/** The call operator will throw if any of the tracked objects are destroyed. */
+/** An object of this type always holds a valid std::function object.
+ *  The call operator will throw if any of the tracked objects are destroyed. */
 template <typename R, typename... Args>
 class Slot<R(Args...)> {
- public:
+   public:
     using Signature_t = R(Args...);
     using Function_t  = std::function<Signature_t>;
 
     /// Exception thrown if any object being tracked has been destroyed.
-    class Expired{};
+    class Expired {};
 
- public:
+   public:
     Slot() = delete;
 
     Slot(std::nullptr_t) = delete;
 
     /// Construct a Slot with the slot function \p f and no tracked objects.
     /** Throws std::invalid_argument if the given function is empty. */
-    Slot(std::function<R(Args...)>);
+    template <typename F>
+    Slot(F f);
 
     /// Copies the slot function and the tracked list into the new Slot.
-    /// Tracked objects by *this are tracked by the new Slot instance.
+    /** Tracked objects by *this are tracked by the new Slot instance. */
     Slot(Slot const&) = default;
 
     /// Moves the slot function and the tracked list into the new Slot.
     Slot(Slot&&) = default;
 
-    /// Copies the slot function as well as the tracked object reference container.
+    /// Copies the slot function and the tracked object reference container.
     auto operator=(Slot const&) -> Slot& = default;
 
-    /// Moves the slot function as well as the tracked object reference container.
+    /// Moves the slot function and the tracked object reference container.
     auto operator=(Slot&&) -> Slot& = default;
 
- public:
+   public:
     /// Track any object owned by a std::shared_ptr<...>.
-    /** Returns *this. */
-    auto track(Lifetime_observer) -> Slot&;
+    /** Returns *this. Tracking the same item multiple times is not checked. */
+    auto track(Lifetime_observer const& x) -> Slot&;
 
     /// Track Lifetime object. Convenience.
-    /** Returns *this. */
-    auto track(Lifetime const&) -> Slot&;
+    /** Returns *this. Tracking the same item multiple times is not checked. */
+    auto track(Lifetime const& x) -> Slot&;
 
     /// Remove the observed object from the tracked objects list.
-    /** Removes on Lifetime_observer::get_id() equality. Returns *this. */
-    auto untrack(Lifetime_observer) -> Slot&;
+    /** Removes on Lifetime_observer::get_id() equality. Returns *this. Throws
+     *  std::invalid_argument if \p x is not being tracked by *this. */
+    auto untrack(Lifetime_observer const& x) -> Slot&;
 
     /// Remove the given Lifetime object from the tracked objects list.
-    /** Removes on Lifetime_observer::get_id() equality. Returns *this. */
-    auto untrack(Lifetime const&) -> Slot&;
+    /** Removes on Lifetime_observer::get_id() equality. Returns *this. Throws
+     *  std::invalid_argument if \p x is not being tracked by *this.*/
+    auto untrack(Lifetime const& x) -> Slot&;
 
     /// Invokes the internally held function
     /** Throws Expired if any tracked object has been destroyed. */
     template <typename... Arguments>
-    auto operator(Arguments&&... args) const -> R;
+    auto operator()(Arguments&&... args) const -> R;
 
     /// Check whether any of the tracked lifetimes has expired.
     /** Returns true if no lifetimes are being tracked. */
@@ -240,38 +245,41 @@ class Slot<R(Args...)> {
     /** Always returns a valid Function_t object that can be called. */
     auto slot_function() const -> Function_t const&;
 
- private:
+   private:
     Function_t f_;
-    std::vector<Lifetime_view> lifetime_trackers_;
+    std::vector<Lifetime_observer> observers_;
 };
+
 ```
 
 ### `class Identifier`
 
 ```cpp
 /// Objects of this type can be unique and compared against other identifiers.
-template <typename Underlying_int = std::uint32_t>
 class Identifier {
- public:
+   public:
+    using Underlying_int = std::uint32_t;
+
+   public:
     /// Construct the initial value.
-    Identifier() = default;
+    Identifier();
 
     /// Generate the next identifier value, this is an increment.
-    static auto next(Identifier) -> Identifier;
+    static auto next(Identifier x) -> Identifier;
 
- public:
+   public:
     /// Return true if both Identifiers have the same internal value.
     friend auto operator==(Identifier x, Identifier y) -> bool;
 
     /// Return true if both Identifiers do not have the same internal value.
     friend auto operator!=(Identifier x, Identifier y) -> bool;
 
- private:
+   private:
     /// Used by next(...).
     Identifier(Underlying_int value);
 
- private:
-    Underlying_int value_ = 0;
+   private:
+    Underlying_int value_;
 };
 ```
 
@@ -288,48 +296,48 @@ its registered `Slots`, and the return value of emitting a `Signal` is a
 template <typename Signature>
 class Signal;
 
+/// An observer type that calls registered callbacks(Slots) when emitted.
 template <typename R, typename... Args>
 class Signal<R(Args...)> {
- public:
-    using Signature_t   = R(Args...);
-    using Emit_result_t = std::conditional_t<std::is_same_v<void, R>,
-                                     void,
-                                     std::optional<R>>;
+   public:
+    using Signature_t = R(Args...);
+    using Emit_result_t =
+        std::conditional_t<std::is_same_v<void, R>, void, std::optional<R>>;
 
- public:
+   public:
     /// Construct a Signal with no connected Slots.
     Signal() = default;
 
-    /// Create a copy that has the same Slots connected, with the same Identifiers.
+    /// Create a Signal with the same Slots connected, and the same Identifiers.
     Signal(Signal const&) = default;
 
-    /// Moves the connected Slots from the existing Signal to the new one.
+    /// Move the connected Slots from the existing Signal to the new one.
     /** The moved from Signal will be empty afterwards. */
     Signal(Signal&&) = default;
 
-    /// Overwrites the existing Signal with the Slots and Identifiers of the rhs.
+    /// Overwrite the existing Signal with the Slots and Identifiers of the rhs.
     auto operator=(Signal const&) -> Signal& = default;
 
-    /// Overwrites the existing Signal with the Slots and Identifiers of the rhs.
+    /// Overwrite the existing Signal with the Slots and Identifiers of the rhs.
     /** The moved from Signal will be empty afterwards. */
     auto operator=(Signal&&) -> Signal& = default;
 
- public:
-    /// Invokes all non-expired Slots.
-    /** Returns the return value of the last connected Slot or std::nullopt if none. */
-    /** Expired Slots are ignored, rather than throwing an exception. */
+   public:
+    /// Invoke all non-expired Slots.
+    /** Returns the return value of the last connected Slot or std::nullopt if
+     *  none. Expired Slots are ignored, rather than throwing an exception. */
     auto emit(Args const&... args) const -> Emit_result_t;
 
-    /// Convenience notation that just wraps emit(...);
+    /// Alternative notation for Signal::emit.
     auto operator()(Args const&... args) const -> Emit_result_t;
 
-    /// Registers the given Slot with *this, will be called on when *this is emitted.
-    /** Returns a unique Identifier, to be used with the disconnect(Identifier) method. */
-    auto connect(Slot<Signature_t>) -> Identifier;
+    /// Register a Slot with *this, will be invoked when *this is emitted.
+    /** Returns a unique Identifier, to be used with Signal::disconnect. */
+    auto connect(Slot<Signature_t> s) -> Identifier;
 
     /// Removes and returns the Slot associated with the given Identifier.
-    /** Throws std::invalid_argument if no connected Slot is associated with the Identifier. */
-    auto disconnect(Identifier) -> Slot<Signature_t>;
+    /** Throws std::invalid_argument if no connected Slot is found with id. */
+    auto disconnect(Identifier id) -> Slot<Signature_t>;
 
     /// Return the number of connected Slots.
     auto slot_count() const -> std::size_t;
@@ -337,8 +345,8 @@ class Signal<R(Args...)> {
     /// Return true if there are no connected Slots.
     auto is_empty() const -> bool;
 
- private:
-    std::vector<std::pair<Identifier, Slot<R, Args...>>>;
+   private:
+    std::vector<std::pair<Identifier, Slot<R(Args...)>>> slots_;
 };
 ```
 
@@ -358,7 +366,7 @@ class Signal<R(Args...)> {
 // Single Slot connect and disconnect.
 {
     sl::Signal<int()> s;
-    Identifier id = s.connect([]{ return 5; });
+    sl::Identifier id = s.connect([]{ return 5; });
     assert(!s.is_empty());
     assert(s.slot_count() == 1)
 
@@ -373,9 +381,9 @@ class Signal<R(Args...)> {
 // Multiple Slots connected and disconnected.
 {
     sl::Signal<int(char, int, bool)> s;
-    Identifier sum_id = s.connect([](char c, int i, bool b) { return c + i + b; });
-    Identifier product_id = s.connect([](char c, int i, bool b) { return c * i * b; });
-    Identifier difference_id = s.connect([](char c, int i, bool b) { return c - i - b; }); 
+    sl::Identifier sum_id = s.connect([](char c, int i, bool b) { return c + i + b; });
+    sl::Identifier product_id = s.connect([](char c, int i, bool b) { return c * i * b; });
+    sl::Identifier difference_id = s.connect([](char c, int i, bool b) { return c - i - b; }); 
 
     assert(s.slot_count() == 3);
     assert(*s(5, 1, false) == 4);
@@ -411,7 +419,7 @@ class Signal<R(Args...)> {
     auto id = s.connect([]{});
     auto slot = s.disconnect(id);
     expect_throw(s.disconnect(id), std::invalid_argument);
-    expect_throw(s.disconnect(Identifier{}), std::invalid_argument);
+    expect_throw(s.disconnect(sl::Identifier{}), std::invalid_argument);
 }
 
 //  Lifetime tracking of single object.
@@ -459,7 +467,7 @@ class Signal<R(Args...)> {
     life_2.reset();
     assert(s() == std::nullopt);
     life_3.reset();
-    assert((s() == std::nullopt);
+    assert(s() == std::nullopt);
     life_4.reset();
     assert(s() == std::nullopt);
 }

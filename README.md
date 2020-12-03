@@ -2,7 +2,7 @@
 
 This is a Signals and Slots library. The `Signal` class is an observer type, it
 can have `Slots`(functions) registered to it, and when the Signal is emitted,
-all registered Slots are invoked. It is written in C++17.
+all registered Slots are invoked. It is written in C++17 and is header only.
 
 Slots can track the lifetime of particular objects and they will disable
 themselves when one of the tracked objects is destroyed. This is useful if the
@@ -11,5 +11,17 @@ might be destroyed before the Signal is destroyed.
 
 This library is 'light' in terms of the boost::Signal2 library, which is thread
 safe, has ordered connections, and in general is more heavy-weight.
+
+```cpp
+#include <signals_light/signal.hpp>
+
+{
+    auto signal = sl::Signal<void(int)>{};
+    signal.connect([](int i){ std::cout << i << '\n'; });
+    signal.connect([](int i){ std::cout << i * 2 << '\n'; });
+
+    signal(4);  // prints "4\n8\n" to standard output.
+}
+```
 
 See the [design doc](docs/design.md) for more information.

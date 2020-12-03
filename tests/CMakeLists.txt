@@ -6,5 +6,3 @@ add_executable(tests EXCLUDE_FROM_ALL
                )
 
 target_link_libraries(tests PRIVATE Catch2::Catch2 signals-light)
-
-
