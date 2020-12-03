@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.14)
 project(Signals_light)
 
-add_subdirectory(external/Catch2)
+if (NOT TARGET Catch2)
+    add_subdirectory(external/Catch2)
+endif()
 
 add_library(signals-light INTERFACE)
 target_compile_features(signals-light INTERFACE cxx_std_17)
