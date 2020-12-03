@@ -25,3 +25,10 @@ safe, has ordered connections, and in general is more heavy-weight.
 ```
 
 See the [design doc](docs/design.md) for more information.
+
+## Getting Started
+
+There is a `CMakeLists.txt` in the project root which contains a library target
+`signals-light`. This can be imported to your CMake project with
+`add_subdirectory`, then use `signals-light` with `target_link_libraries` in
+your project to get access to the header(`#include <signals_light/signal.hpp>`).
