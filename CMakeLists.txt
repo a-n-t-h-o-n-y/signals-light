@@ -16,6 +16,14 @@ endif()
 
 target_compile_options(signals-light INTERFACE -Wall -Wextra)
 
+include(GNUInstallDirs)
+install(
+    DIRECTORY
+        ${PROJECT_SOURCE_DIR}/include/signals_light
+    DESTINATION
+        ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
 if (NOT TARGET Catch2)
     add_subdirectory(external/Catch2)
 endif()
