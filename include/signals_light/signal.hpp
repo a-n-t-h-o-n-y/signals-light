@@ -141,9 +141,17 @@ class Slot<R(Args...)> {
     Slot(std::nullptr_t) = delete;
 
     /// Construct a Slot with the slot function \p f and no tracked objects.
-    /** Throws std::invalid_argument if the given function is empty. */
+    /** F must be invocable with Args... and return convertible to R. */
     template <typename F>
-    Slot(F f) noexcept(false) : f_{sanitize(std::move(f))} {}
+    Slot(F f) : f_{f}
+    {
+        static_assert(std::is_invocable_r_v<R, F, Args...>,
+                      "Slot initialization with invalid function type.");
+    }
+
+    /// Construct a Slot with the slot function \p f and no tracked objects.
+    /** Throws std::invalid_argument if the given function is empty. */
+    Slot(Function_t f) noexcept(false) : f_{sanitize(std::move(f))} {}
 
     /// Copies the slot function and the tracked list into the new Slot.
     /** Tracked objects by *this are tracked by the new Slot instance. */
@@ -227,7 +235,7 @@ class Slot<R(Args...)> {
     std::vector<Lifetime_observer> observers_;
 
    private:
-    /// Throws std::invalid_argument if p == nullptr, returns \p p otherwise.
+    /// Throws std::invalid_argument if f == nullptr, returns \p f otherwise.
     static auto sanitize(Function_t f) noexcept(false) -> Function_t
     {
         auto constexpr message = "Slot must be initialized with valid function";
