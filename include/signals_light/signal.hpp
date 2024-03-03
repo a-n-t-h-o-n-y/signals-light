@@ -294,6 +294,9 @@ class Signal<R(Args...)> {
     /// Construct a Signal with no connected Slots.
     Signal() = default;
 
+    /// Construct a Signal with the given Slot connected.
+    Signal(Slot<Signature_t> slot) { this->connect(std::move(slot)); }
+
     /// Create a Signal with the same Slots connected, and the same Identifiers.
     Signal(Signal const&) = default;
 
