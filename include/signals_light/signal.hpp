@@ -297,6 +297,16 @@ class Signal<R(Args...)> {
     /// Construct a Signal with the given Slot connected.
     Signal(Slot<Signature_t> slot) { this->connect(std::move(slot)); }
 
+    /// Construct a Signal with the given Slot function connected.
+    /// Seems to be the only way to pass a lambda in certain contexts.
+    template <typename F>
+    Signal(F slot_fn)
+    {
+        static_assert(std::is_invocable_r_v<R, F, Args...>,
+                      "Slot initialization with invalid function type.");
+        this->connect(Slot<Signature_t>{std::move(slot_fn)});
+    }
+
     /// Create a Signal with the same Slots connected, and the same Identifiers.
     Signal(Signal const&) = default;
 
