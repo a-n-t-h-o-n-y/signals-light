@@ -10,7 +10,7 @@ function you are registering with the Signal holds a reference to an object that
 might be destroyed before the Signal is destroyed.
 
 This library is 'light' in terms of the boost::Signal2 library, which is thread
-safe, has ordered connections, and in general is more heavy-weight.
+safe, has ordered connections, and in general is more feature-heavy.
 
 ```cpp
 #include <signals_light/signal.hpp>
@@ -24,11 +24,9 @@ safe, has ordered connections, and in general is more heavy-weight.
 }
 ```
 
-See the [design doc](docs/design.md) for more information.
-
 ## Getting Started
 
-There is a `CMakeLists.txt` in the project root which contains a library target
-`signals-light`. This can be imported to your CMake project with
-`add_subdirectory`, then use `signals-light` with `target_link_libraries` in
-your project to get access to the header(`#include <signals_light/signal.hpp>`).
+The `CMakeLists.txt` file will give you a `signals-light` library target to link against in your own project.
+
+- `#include <signals_light/signal.hpp>`
+- namespace `sl`.
