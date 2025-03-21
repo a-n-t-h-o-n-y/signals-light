@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Signals_light LANGUAGES CXX)
+project(SignalsLight LANGUAGES CXX)
 
 add_library(signals-light INTERFACE)
 
@@ -20,9 +20,5 @@ install(
     DESTINATION
         ${CMAKE_INSTALL_INCLUDEDIR}
 )
-
-if (NOT TARGET Catch2)
-    add_subdirectory(external/Catch2)
-endif()
 
 add_subdirectory(tests)
