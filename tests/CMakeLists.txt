@@ -3,23 +3,47 @@ include(FetchContent)
 FetchContent_Declare(
     zzz
     GIT_REPOSITORY https://github.com/a-n-t-h-o-n-y/zzz.git
-    GIT_TAG dcf3a15309e9919246e525a0a5c12108b6876380
+    GIT_TAG 4cef6b4c2fad3ff9a43a40e9bda54d0a4585af9f
 )
 FetchContent_MakeAvailable(zzz)
 
-add_executable(signals_light_tests EXCLUDE_FROM_ALL
+add_executable(signals_light.tests.unit EXCLUDE_FROM_ALL
     signal.test.cpp
 )
 
-target_link_libraries(signals_light_tests
+target_link_libraries(signals_light.tests.unit
     PRIVATE
         signals-light
         zzz
 )
 
-target_compile_options(signals_light_tests
+target_compile_options(signals_light.tests.unit
     PRIVATE
         -Wall
         -Wextra
         -Wpedantic
 )
+
+message(STATUS "AddressSanitizer Enabled for signals_light.tests.unit")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(signals_light.tests.unit
+        PRIVATE
+            -fsanitize=address
+            -fno-omit-frame-pointer
+    )
+    target_link_options(signals_light.tests.unit
+        PRIVATE
+            -fsanitize=address
+    )
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    target_compile_options(signals_light.tests.unit
+        PRIVATE
+            /fsanitize=address
+    )
+    target_link_options(signals_light.tests.unit
+        PRIVATE
+            /INCREMENTAL:NO
+            /DEBUG
+            /fsanitize=address
+    )
+endif()
