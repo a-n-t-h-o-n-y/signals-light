@@ -30,3 +30,9 @@ The `CMakeLists.txt` file will give you a `signals-light` library target to link
 
 - `#include <signals_light/signal.hpp>`
 - namespace `sl`.
+
+## CMake Options
+
+- `SIGNALS_LIGHT_BUILD_TESTS` (default: `OFF`): builds test targets under `tests/`.
+- With default options, configuring `signals-light` does not fetch test dependencies (such as `zzz`).
+- To enable tests: `cmake -S . -B build -DSIGNALS_LIGHT_BUILD_TESTS=ON` (and keep `BUILD_TESTING=ON`).

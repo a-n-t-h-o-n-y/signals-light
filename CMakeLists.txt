@@ -3,6 +3,8 @@ project(SignalsLight LANGUAGES CXX)
 
 add_library(signals-light INTERFACE)
 
+option(SIGNALS_LIGHT_BUILD_TESTS "Build signals-light tests" OFF)
+
 target_include_directories(signals-light
     INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -21,4 +23,9 @@ install(
         ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-add_subdirectory(tests)
+if(SIGNALS_LIGHT_BUILD_TESTS)
+    include(CTest)
+    if(BUILD_TESTING)
+        add_subdirectory(tests)
+    endif()
+endif()
